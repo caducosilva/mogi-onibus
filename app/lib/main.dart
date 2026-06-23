@@ -38,12 +38,18 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
+enum SyncStatus { idle, checking, upToDate, available, offline }
+
 class _HomePageState extends State<HomePage> {
   final _repo = ScheduleRepository();
   final _updates = UpdateService();
   SchedulesData? _data;
   String _query = '';
   bool _loading = true;
+
+  SyncStatus _status = SyncStatus.idle;
+  RemoteCheck? _remote;
+  String? _lastChecked; // ISO
 
   @override
   void initState() {
@@ -53,27 +59,51 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _init() async {
     final data = await _repo.loadLocal();
+    final last = await _repo.lastCheckedAt();
     setState(() {
       _data = data;
+      _lastChecked = last;
       _loading = false;
     });
     // verificações de atualização em segundo plano, após o primeiro frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkScheduleUpdate();
+      _checkScheduleUpdate(showPopup: true);
       _checkAppUpdate();
     });
   }
 
-  Future<void> _checkScheduleUpdate() async {
+  /// Verifica horários no GitHub. Atualiza o status na tela e, se [showPopup],
+  /// abre o popup quando há novidade.
+  Future<void> _checkScheduleUpdate({bool showPopup = false}) async {
+    setState(() => _status = SyncStatus.checking);
     final remote = await _repo.checkRemote();
-    if (remote == null || !mounted) return;
+    if (!mounted) return;
+    final last = await _repo.lastCheckedAt();
+    setState(() {
+      _remote = remote;
+      _lastChecked = last;
+      if (remote == null) {
+        _status = SyncStatus.offline;
+      } else {
+        _status =
+            remote.isNewer ? SyncStatus.available : SyncStatus.upToDate;
+      }
+    });
+    if (remote != null && remote.isNewer && showPopup) {
+      await _promptApplySchedule();
+    }
+  }
+
+  Future<void> _promptApplySchedule() async {
+    final remote = _remote;
+    if (remote == null) return;
     final accept = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.update),
         title: const Text('Novos horários disponíveis'),
         content: Text(
-            'Há uma atualização de horários (versão ${remote.dataVersao}).\n'
+            'Há uma atualização de horários (${_friendlyDate(remote.remoteVersion)}).\n'
             'Deseja atualizar agora? É rápido e funciona offline depois.'),
         actions: [
           TextButton(
@@ -86,9 +116,12 @@ class _HomePageState extends State<HomePage> {
       ),
     );
     if (accept == true) {
-      await _repo.applyPending(remote);
+      await _repo.applyPending(remote.data);
       if (!mounted) return;
-      setState(() => _data = remote);
+      setState(() {
+        _data = remote.data;
+        _status = SyncStatus.upToDate;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Horários atualizados!')),
       );
@@ -144,7 +177,7 @@ class _HomePageState extends State<HomePage> {
           : Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
                   child: TextField(
                     decoration: InputDecoration(
                       hintText: 'Buscar linha (nº, nome, bairro)...',
@@ -155,47 +188,145 @@ class _HomePageState extends State<HomePage> {
                     onChanged: (v) => setState(() => _query = v),
                   ),
                 ),
-                if (_data != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(
-                      children: [
-                        Icon(Icons.event,
-                            size: 14, color: Theme.of(context).hintColor),
-                        const SizedBox(width: 4),
-                        Text(
-                            'Horários de ${_data!.dataVersao}  •  '
-                            '${lines.length} linhas',
-                            style: Theme.of(context).textTheme.bodySmall),
-                      ],
-                    ),
-                  ),
+                if (_data != null) _buildSyncCard(context, lines.length),
                 Expanded(
-                  child: ListView.separated(
-                    itemCount: lines.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (ctx, i) {
-                      final l = lines[i];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          child: Text(l.linha.length > 4
-                              ? l.linha.substring(0, 4)
-                              : l.linha),
+                  child: lines.isEmpty
+                      ? Center(
+                          child: Text('Nenhuma linha encontrada.',
+                              style: Theme.of(context).textTheme.bodyMedium),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                          itemCount: lines.length,
+                          itemBuilder: (ctx, i) =>
+                              _LineCard(line: lines[i]),
                         ),
-                        title: Text(l.nome.isNotEmpty ? l.nome : l.titulo),
-                        subtitle: Text('Linha ${l.linha}'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => LineDetailPage(line: l)),
-                        ),
-                      );
-                    },
-                  ),
                 ),
               ],
             ),
+    );
+  }
+
+  /// "2026-06-23" -> "23/06/2026"
+  String _friendlyDate(String iso) {
+    final p = iso.split('T').first.split('-');
+    if (p.length != 3) return iso;
+    return '${p[2]}/${p[1]}/${p[0]}';
+  }
+
+  /// "...T14:31:00" -> "23/06 às 14:31"
+  String _friendlyDateTime(String iso) {
+    try {
+      final d = DateTime.parse(iso).toLocal();
+      String two(int n) => n.toString().padLeft(2, '0');
+      return '${two(d.day)}/${two(d.month)} às ${two(d.hour)}:${two(d.minute)}';
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  Widget _buildSyncCard(BuildContext context, int lineCount) {
+    final cs = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+
+    // status visual
+    late IconData icon;
+    late Color tint;
+    late String statusText;
+    Widget? action;
+    switch (_status) {
+      case SyncStatus.checking:
+        icon = Icons.sync;
+        tint = cs.primary;
+        statusText = 'Verificando atualizações...';
+        break;
+      case SyncStatus.available:
+        icon = Icons.notifications_active;
+        tint = cs.tertiary;
+        statusText =
+            'Nova atualização disponível (${_friendlyDate(_remote!.remoteVersion)})';
+        action = FilledButton.tonal(
+          onPressed: _promptApplySchedule,
+          child: const Text('Atualizar'),
+        );
+        break;
+      case SyncStatus.upToDate:
+        icon = Icons.check_circle;
+        tint = Colors.green;
+        statusText = 'Você está com os horários mais recentes';
+        break;
+      case SyncStatus.offline:
+        icon = Icons.cloud_off;
+        tint = cs.error;
+        statusText = 'Sem internet — usando horários salvos';
+        action = TextButton(
+          onPressed: () => _checkScheduleUpdate(showPopup: true),
+          child: const Text('Tentar'),
+        );
+        break;
+      case SyncStatus.idle:
+        icon = Icons.event;
+        tint = cs.onSurfaceVariant;
+        statusText = '';
+        break;
+    }
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+        child: Row(
+          children: [
+            Icon(Icons.directions_bus, color: cs.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Horários atualizados em ${_friendlyDate(_data!.dataVersao)}',
+                    style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(icon, size: 14, color: tint),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          statusText.isNotEmpty
+                              ? statusText
+                              : '$lineCount linhas disponíveis',
+                          style: t.bodySmall?.copyWith(color: tint),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_lastChecked != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        'Verificado no GitHub: ${_friendlyDateTime(_lastChecked!)}',
+                        style: t.labelSmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            action ??
+                IconButton(
+                  tooltip: 'Verificar agora',
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _status == SyncStatus.checking
+                      ? null
+                      : () => _checkScheduleUpdate(showPopup: true),
+                ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -223,6 +354,62 @@ class _HomePageState extends State<HomePage> {
               mode: LaunchMode.externalApplication),
         ),
       ],
+    );
+  }
+}
+
+class _LineCard extends StatelessWidget {
+  final BusLine line;
+  const _LineCard({required this.line});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => LineDetailPage(line: line)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+          child: Row(
+            children: [
+              Container(
+                constraints: const BoxConstraints(minWidth: 56),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  line.linha,
+                  textAlign: TextAlign.center,
+                  style: t.titleSmall?.copyWith(
+                    color: cs.onPrimaryContainer,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  line.nome.isNotEmpty ? line.nome : line.titulo,
+                  style: t.titleMedium,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

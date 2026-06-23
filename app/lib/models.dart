@@ -1,4 +1,5 @@
 /// Modelos de dados dos horários.
+library;
 
 class SchedulesData {
   final String dataVersao;
