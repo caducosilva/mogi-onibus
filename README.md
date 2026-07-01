@@ -1,96 +1,94 @@
 # 🚌 Ônibus Mogi
 
-App Android **não oficial** com os horários de ônibus de **Mogi das Cruzes (SP)**.
-Funciona **offline**, é leve e os horários são atualizados pela internet sem
-precisar reinstalar o app.
+**App Android não oficial com os horários de ônibus de Mogi das Cruzes (SP).**
 
-> Dados extraídos do portal da **Secretaria de Mobilidade e Trânsito** de Mogi das Cruzes:
-> <https://mobilidadeservicos.mogidascruzes.sp.gov.br/site/transportes>
+Consulte as **83 linhas** da cidade de forma rápida, **offline** e sem anúncios.
+O app mostra o **próximo ônibus** com base no horário e no dia da semana, e os
+horários são atualizados pela internet **sem precisar reinstalar**.
 
-## ✨ Recursos
+> Dados extraídos do portal da **Secretaria de Mobilidade e Trânsito** de Mogi das Cruzes.
 
-- **83 linhas** com horários de **Dia Útil**, **Sábado** e **Domingo/Feriado**, nos dois sentidos (Ida / Volta).
+<!-- Sugestão: adicionar aqui prints da tela inicial e dos horários de uma linha. -->
+
+---
+
+## ✨ O que o app faz
+
+- **83 linhas** com horários de **Dia Útil**, **Sábado** e **Domingo/Feriado**,
+  nos dois sentidos (Ida / Volta).
 - **Busca** por número da linha, nome ou bairro.
-- **Destaque do próximo ônibus** com base no horário atual e no dia da semana.
+- **Destaque do próximo ônibus** conforme o horário atual.
 - **100% offline** depois da primeira abertura.
-- **Atualização de horários pela internet**: quando os horários do repositório são mais recentes, o app mostra um popup perguntando se você quer atualizar.
-- **Aviso de nova versão do app**: quando há um novo APK publicado nos *Releases* do GitHub, o app avisa ao abrir.
+- **Apoie com Pix** (opcional): QR Code e chave gerados no próprio aparelho.
 
-## 📥 Instalação
+## 📥 Como baixar e instalar (passo a passo)
 
-1. Vá em [**Releases**](../../releases/latest).
-2. Baixe o arquivo `.apk`.
-3. No Android, abra o arquivo e permita "instalar de fontes desconhecidas".
+1. Abra a página de **[Releases](../../releases/latest)** no celular.
+2. Baixe o arquivo **`.apk`**.
+3. Toque no arquivo e, se pedir, permita **"instalar de fontes desconhecidas"**.
+4. Pronto! É compatível com **Android 5.0 ou superior**.
 
-Compatível com **Android 5.0 (API 21) ou superior** — APK universal (todas as arquiteturas).
+## 🔄 Atualizações (o que faz esse app ser especial)
 
-## 🔄 Como funciona a atualização
+Existem **dois tipos de atualização, independentes**:
 
-Existem **dois tipos** de atualização, independentes:
+| O quê | Como chega até você | Precisa reinstalar? |
+|------|---------------------|---------------------|
+| **Horários** | O app baixa o `schedules.json` novo do GitHub e avisa | ❌ Não |
+| **App** | Quando sai um APK novo nos *Releases*, o app avisa (1x/dia até atualizar) | ✅ Sim |
 
-| O quê | Onde fica | Quando atualizar | Esforço |
-|------|-----------|------------------|---------|
-| **Horários** (`schedules.json`) | arquivo no repositório | semanalmente / quando a prefeitura mudar | só dar `commit` no JSON |
-| **App** (`.apk`) | *Releases* do GitHub | só quando o código muda | publicar um novo release |
+Ou seja: quando a prefeitura muda um horário, você recebe a atualização **na
+próxima vez que abrir o app**, sem baixar nada manualmente.
 
-O app, ao abrir:
+## 🔒 Privacidade
 
-1. Mostra os horários do **cache local** (ou do JSON embarcado, na primeira vez).
-2. Em segundo plano, compara `data_versao` do `schedules.json` no GitHub com a versão local. Se for **mais nova**, oferece o popup *"Novos horários disponíveis"*.
-3. Consulta o último *release* via API do GitHub. Se a versão (`tag`) for **maior** que a instalada, oferece o popup *"Nova versão do app"* com link de download.
-
-## 🗓️ Atualizando os horários (rotina semanal)
-
-```bash
-# 1. Re-raspar o site
-python tools/scrape.py            # regenera app/assets/schedules.json
-
-# 2. Commitar e enviar
-git add app/assets/schedules.json
-git commit -m "horarios: atualização semanal"
-git push
-```
-
-Pronto — todos os usuários com o app instalado recebem o popup de atualização de
-horários na próxima abertura. **Não precisa gerar novo APK.**
-
-## 🛠️ Build do app (quando o código muda)
-
-```bash
-cd app
-flutter pub get
-flutter build apk --release      # gera build/app/outputs/flutter-apk/app-release.apk
-```
-
-A assinatura usa `app/android/key.properties` (não versionado). Veja
-`app/android/key.properties.example`.
-
-Para publicar:
-
-```bash
-# subir a versão em app/pubspec.yaml (ex.: 1.0.1+2), depois:
-gh release create v1.0.1 build/app/outputs/flutter-apk/app-release.apk \
-  --title "v1.0.1" --notes "Novidades..."
-```
-
-## 📂 Estrutura
-
-```
-mogi-onibus/
-├── app/                    # projeto Flutter
-│   ├── assets/schedules.json   # horários (fonte da verdade p/ o app)
-│   └── lib/                    # código Dart
-├── tools/scrape.py         # raspador do site da prefeitura
-├── LICENSE                 # MIT
-└── README.md
-```
+Não coleta dados pessoais. A única conexão com a internet é para buscar horários
+novos e verificar se há uma versão nova do app.
 
 ## ⚖️ Aviso
 
-Projeto pessoal e **não oficial**. Os horários podem mudar a qualquer momento;
-confira sempre a [fonte oficial](https://mobilidadeservicos.mogidascruzes.sp.gov.br/site/transportes).
-Sem afiliação com a Prefeitura de Mogi das Cruzes ou com as empresas operadoras.
+Projeto pessoal e **não oficial**, sem afiliação com a Prefeitura ou com as
+empresas operadoras. Confira sempre a
+[fonte oficial](https://mobilidadeservicos.mogidascruzes.sp.gov.br/site/transportes).
+
+---
+
+## 🛠️ Para desenvolvedores
+
+App **Flutter** com uma arquitetura de **atualização OTA em duas camadas** (dados
+e binário), servindo os horários direto do repositório.
+
+**Stack:** Flutter · Dart · `http` · `shared_preferences` · GitHub Releases API.
+
+**Como funciona a atualização de horários:** o app compara o campo `data_versao`
+do `assets/schedules.json` local com o do repositório (via `raw.githubusercontent`).
+Se o remoto for mais novo, oferece aplicar. O binário é verificado pela API de
+*releases* do GitHub (aviso no máximo 1x/dia até atualizar).
+
+**Atualizar os horários (rotina semanal, sem gerar APK):**
+```bash
+python tools/scrape.py                       # regenera app/assets/schedules.json
+git add app/assets/schedules.json
+git commit -m "horarios: atualização semanal" && git push
+```
+
+**Build do app (quando o código muda):**
+```bash
+cd app
+flutter pub get
+flutter build apk --release   # build/app/outputs/flutter-apk/app-release.apk
+```
+
+**Estrutura:**
+```
+mogi-onibus/
+├── app/                       # projeto Flutter
+│   ├── assets/schedules.json  # horários (fonte da verdade do app)
+│   └── lib/                   # UI, repositório, update service, doação Pix
+├── tools/scrape.py            # raspador do site da prefeitura
+└── README.md
+```
 
 ## 📄 Licença
 
-[MIT](LICENSE) © 2026 Carlos Eduardo (@abobicaduco)
+MIT © 2026 Carlos Eduardo (@abobicaduco)
