@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
 
@@ -56,6 +57,26 @@ class UpdateService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Já avisamos hoje sobre esta versão? (aviso no máximo 1x por dia, mas
+  /// volta todo dia até a pessoa atualizar).
+  Future<bool> alreadyPromptedToday(String tag) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('app_update_prompt_date') == _todayKey() &&
+        prefs.getString('app_update_prompt_tag') == tag;
+  }
+
+  /// Marca que o aviso desta versão foi mostrado hoje.
+  Future<void> markPromptedToday(String tag) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_update_prompt_date', _todayKey());
+    await prefs.setString('app_update_prompt_tag', tag);
+  }
+
+  String _todayKey() {
+    final n = DateTime.now();
+    return '${n.year}-${n.month}-${n.day}';
   }
 
   /// Compara versões "1.2.3". Retorna true se [a] > [b].

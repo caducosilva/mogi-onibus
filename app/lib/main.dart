@@ -132,6 +132,10 @@ class _HomePageState extends State<HomePage> {
   Future<void> _checkAppUpdate() async {
     final rel = await _updates.checkAppUpdate();
     if (rel == null || !mounted) return;
+    // Aviso no máximo 1x por dia por versão, repetindo todo dia até atualizar.
+    if (await _updates.alreadyPromptedToday(rel.tag)) return;
+    await _updates.markPromptedToday(rel.tag);
+    if (!mounted) return;
     final go = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
