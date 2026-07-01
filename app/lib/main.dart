@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'config.dart';
+import 'donation.dart';
 import 'models.dart';
 import 'schedule_repository.dart';
 import 'update_service.dart';
@@ -165,6 +166,12 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: const Text('Ônibus Mogi'),
         actions: [
+          IconButton(
+            tooltip: 'Apoiar com Pix',
+            icon: const Icon(Icons.favorite_outline),
+            color: const Color(0xFFD81B60),
+            onPressed: () => showDonationSheet(context),
+          ),
           IconButton(
             tooltip: 'Sobre',
             icon: const Icon(Icons.info_outline),

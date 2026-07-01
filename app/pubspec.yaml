@@ -1,7 +1,7 @@
 name: mogionibus
 description: "Horários de ônibus de Mogi das Cruzes — não oficial."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.12.2
@@ -15,6 +15,7 @@ dependencies:
   package_info_plus: ^8.0.2
   url_launcher: ^6.3.0
   intl: ^0.19.0
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
