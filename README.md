@@ -91,4 +91,11 @@ mogi-onibus/
 
 ## 📄 Licença
 
-MIT © 2026 Carlos Eduardo (@abobicaduco)
+MIT © 2026 Carlos Eduardo (@caducosilva)
+
+## Autor
+
+**CADUCOSILVA** — [Carlos Eduardo (@caducosilva)](https://github.com/caducosilva)  
+Contato: abobicarlo@gmail.com
+
+Doações via PIX (chave aleatória): `f74458dc-2a36-49bd-9250-1cef4365ebb8`

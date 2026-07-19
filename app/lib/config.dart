@@ -1,6 +1,6 @@
 /// Configurações de repositório usadas para atualização OTA.
 class AppConfig {
-  static const String githubOwner = 'abobicaduco';
+  static const String githubOwner = 'caducosilva';
   static const String githubRepo = 'mogi-onibus';
 
   /// JSON de horários servido direto do repositório (atualizado semanalmente).
